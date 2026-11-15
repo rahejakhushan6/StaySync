@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StaySync - Hostel Management System</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234F46E5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'></path><polyline points='9 22 9 12 15 12 15 22'></polyline></svg>" />
+  <!-- Plus Jakarta Sans Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- QRCode.js for Gate Pass rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              200: '#c7d2fe',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; }
+    .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); }
+    .badge-urgent { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+    .badge-high { background: #ffedd5; color: #ea580c; border: 1px solid #fdba74; }
+    .badge-medium { background: #fef9c3; color: #ca8a04; border: 1px solid #fde047; }
+    .badge-low { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Default Seed Data
+    const INITIAL_USERS = [
+      { id: 1, name: 'Alex Rivers', email: 'alex.student@staysync.edu', role: 'STUDENT', room: 'B-204', bed: 'B-1', phone: '+1-555-0101', dept: 'Computer Science', year: 3 },
+      { id: 2, name: 'Sarah Chen', email: 'sarah.student@staysync.edu', role: 'STUDENT', room: 'B-204', bed: 'B-2', phone: '+1-555-0102', dept: 'Mechanical Engg', year: 2 },
+      { id: 3, name: 'Dr. Robert Sharma', email: 'warden@staysync.edu', role: 'WARDEN', room: 'Admin Suite 101', bed: '-', phone: '+1-555-0201', dept: 'Chief Warden', year: '-' },
+      { id: 4, name: 'Dean Eleanor Vance', email: 'admin@staysync.edu', role: 'ADMINISTRATOR', room: 'Dean Office', bed: '-', phone: '+1-555-0301', dept: 'Administration', year: '-' },
+      { id: 5, name: 'Marcus Fixer', email: 'maintenance@staysync.edu', role: 'MAINTENANCE', room: 'Workshop B', bed: '-', phone: '+1-555-0401', dept: 'Facilities & Repairs', year: '-' },
+      { id: 6, name: 'Officer Vikram Khan', email: 'security@staysync.edu', role: 'SECURITY', room: 'Main Gate 1', bed: '-', phone: '+1-555-0501', dept: 'Campus Security', year: '-' }
+    ];
+
+    const INITIAL_ROOMS = [
+      { id: 1, roomNumber: 'A-101', block: 'Aryabhata (East)', floor: 1, type: 'SINGLE', capacity: 1, occupied: 1, rent: 450, status: 'FULL' },
+      { id: 2, roomNumber: 'A-102', block: 'Aryabhata (East)', floor: 1, type: 'SINGLE', capacity: 1, occupied: 0, rent: 450, status: 'AVAILABLE' },
+      { id: 3, roomNumber: 'B-204', block: 'Bhabha (West)', floor: 2, type: 'DOUBLE', capacity: 2, occupied: 2, rent: 320, status: 'FULL' },
+      { id: 4, roomNumber: 'B-205', block: 'Bhabha (West)', floor: 2, type: 'DOUBLE', capacity: 2, occupied: 1, rent: 320, status: 'AVAILABLE' },
+      { id: 5, roomNumber: 'C-301', block: 'Curie (North)', floor: 3, type: 'TRIPLE', capacity: 3, occupied: 2, rent: 240, status: 'AVAILABLE' },
+      { id: 6, roomNumber: 'D-401', block: 'Da Vinci (Exec)', floor: 4, type: 'DELUXE_AC', capacity: 1, occupied: 0, rent: 600, status: 'AVAILABLE' }
+    ];
+
+    const INITIAL_FEES = [
+      { id: 1, studentId: 1, type: 'Hostel Rent (Nov 2026)', amount: 960, dueDate: '2026-11-05', paidDate: '2026-11-03', status: 'PAID', ref: 'TXN-982144', receipt: 'REC-2026-1102' },
+      { id: 2, studentId: 1, type: 'Mess Fee (Nov 2026)', amount: 420, dueDate: '2026-11-25', paidDate: null, status: 'PENDING', ref: null, receipt: null },
+      { id: 3, studentId: 1, type: 'Maintenance Deposit', amount: 100, dueDate: '2026-10-15', paidDate: '2026-10-12', status: 'PAID', ref: 'TXN-874512', receipt: 'REC-2026-1012' },
+      { id: 4, studentId: 2, type: 'Hostel Rent (Nov 2026)', amount: 960, dueDate: '2026-11-05', paidDate: null, status: 'OVERDUE', ref: null, receipt: null }
+    ];
+
+    const INITIAL_COMPLAINTS = [
+      { id: 1, studentId: 1, studentName: 'Alex Rivers', room: 'B-204', title: 'Washbasin pipe leaking in B-204', description: 'Constant dripping under sink forming water puddle', category: 'PLUMBING', priority: 'HIGH', aiPredicted: 'PLUMBING', status: 'IN_PROGRESS', assignee: 'Marcus Fixer', notes: 'Inspection done, parts ordered.', date: '2026-11-14' },
+      { id: 2, studentId: 1, studentName: 'Alex Rivers', room: 'B-204', title: 'Ceiling fan rattling sound', description: 'Vibration and clicking noise at level 4 and 5', category: 'ELECTRICAL', priority: 'MEDIUM', aiPredicted: 'ELECTRICAL', status: 'SUBMITTED', assignee: 'Unassigned', notes: null, date: '2026-11-15' },
+      { id: 3, studentId: 2, studentName: 'Sarah Chen', room: 'B-204', title: 'Study desk light flickering', description: 'Tube light flashes on/off repeatedly', category: 'ELECTRICAL', priority: 'LOW', aiPredicted: 'ELECTRICAL', status: 'RESOLVED', assignee: 'Marcus Fixer', notes: 'Replaced with 12W Phillips Warm LED.', date: '2026-11-12' }
+    ];
+
+    const INITIAL_LEAVES = [
+      { id: 1, studentId: 1, studentName: 'Alex Rivers', room: 'B-204', type: 'HOME_VISIT', from: '2026-11-20 18:00', to: '2026-11-23 21:00', reason: 'Family Diwali festival & sibling wedding', destination: 'Springfield', parentContact: '+1-555-9901', status: 'APPROVED', wardenRemarks: 'Parent consent verified via phone call.', gatePass: 'GP-2026-98114' },
+      { id: 2, studentId: 2, studentName: 'Sarah Chen', room: 'B-204', type: 'ACADEMIC_CONFERENCE', from: '2026-11-18 08:00', to: '2026-11-19 20:00', reason: 'IEEE Student Conference paper presentation', destination: 'Tech Hub Convention Center', parentContact: '+1-555-9902', status: 'PENDING', wardenRemarks: null, gatePass: null }
+    ];
+
+    const INITIAL_VISITORS = [
+      { id: 1, name: 'Michael Rivers', phone: '+1-555-4411', idType: 'Driving License', idNumber: 'DL-CA-994821', studentName: 'Alex Rivers (B-204)', relation: 'Father', purpose: 'Delivering winter apparel & medicine', inTime: '2026-11-14 14:15', outTime: '2026-11-14 16:30', status: 'CHECKED_OUT' },
+      { id: 2, name: 'Jessica Chen', phone: '+1-555-4422', idType: 'Passport', idNumber: 'PASS-US-882194', studentName: 'Sarah Chen (B-204)', relation: 'Sister', purpose: 'Weekend campus visit', inTime: '2026-11-15 11:30', outTime: null, status: 'INSIDE' }
+    ];
+
+    const MESS_MENUS = [
+      { day: 'Monday', meal: 'Breakfast', time: '07:30 - 09:30 AM', items: 'Idli Sambar, Coconut Chutney, Poha, Boiled Eggs, Tea & Coffee', cal: 520 },
+      { day: 'Monday', meal: 'Lunch', time: '12:30 - 02:30 PM', items: 'Paneer Butter Masala, Yellow Dal Tadka, Jeera Rice, Tandoori Roti, Salad', cal: 740 },
+      { day: 'Monday', meal: 'Snacks', time: '05:00 - 06:15 PM', items: 'Crispy Veg Pakoras, Green Chutney, Biscuits, Hot Masala Chai', cal: 310 },
+      { day: 'Monday', meal: 'Dinner', time: '07:45 - 09:45 PM', items: 'Kadai Mushroom / Chicken Curry, Steamed Rice, Chapati, Gulab Jamun', cal: 780 },
+      { day: 'Tuesday', meal: 'Breakfast', time: '07:30 - 09:30 AM', items: 'Aloo Paratha with Curd, Cornflakes with Milk, Scrambled Eggs, Coffee', cal: 580 },
+      { day: 'Tuesday', meal: 'Lunch', time: '12:30 - 02:30 PM', items: 'Rajma Masala, Aloo Gobi Dry, Phulka, Boondi Raita, Roasted Papad', cal: 710 }
+    ];
+
+    function App() {
+      // Current logged in user / active role
+      const [currentUser, setCurrentUser] = useState(() => {
+        const saved = localStorage.getItem('staysync_user');
+        return saved ? JSON.parse(saved) : INITIAL_USERS[0];
+      });
+
+      // Data States
+      const [users, setUsers] = useState(INITIAL_USERS);
+      const [rooms, setRooms] = useState(INITIAL_ROOMS);
+      const [fees, setFees] = useState(INITIAL_FEES);
+      const [complaints, setComplaints] = useState(INITIAL_COMPLAINTS);
+      const [leaves, setLeaves] = useState(INITIAL_LEAVES);
+      const [visitors, setVisitors] = useState(INITIAL_VISITORS);
+
+      // UI States
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [isAiOpen, setIsAiOpen] = useState(false);
+      const [notificationAlert, setNotificationAlert] = useState(null);
+      const [emergencyBroadcast, setEmergencyBroadcast] = useState("🔔 Curfew Notice: Campus gates close strictly at 10:00 PM. Gate Pass QR required for late entry.");
+      const [showGatePassModal, setShowGatePassModal] = useState(null);
+      const [receiptModal, setReceiptModal] = useState(null);
+
+      // AI Chat messages
+      const [aiMessages, setAiMessages] = useState([
+        { sender: 'ai', text: '👋 Hi Alex! I am StaySync AI. Ask me about mess food, fee payments, lodging complaints, or hostel gate pass rules.' }
+      ]);
+      const [aiInput, setAiInput] = useState('');
+      const [isAiLoading, setIsAiLoading] = useState(false);
+
+      // Switch Role helper
+      const switchRole = (userId) => {
+        const target = users.find(u => u.id === Number(userId));
+        if (target) {
+          setCurrentUser(target);
+          localStorage.setItem('staysync_user', JSON.stringify(target));
+          showToast(`Switched view to ${target.name} (${target.role})`);
+        }
+      };
+
+      const showToast = (msg) => {
+        setNotificationAlert(msg);
+        setTimeout(() => setNotificationAlert(null), 4000);
+      };
+
+      // AI Chat Handler
+      const sendAiMessage = (e) => {
+        e?.preventDefault();
+        if (!aiInput.trim()) return;
+
+        const userMsg = aiInput.trim();
+        const updated = [...aiMessages, { sender: 'user', text: userMsg }];
+        setAiMessages(updated);
+        setAiInput('');
+        setIsAiLoading(true);
+
+        setTimeout(() => {
+          let reply = '';
+          const p = userMsg.toLowerCase();
+          if (p.contains('mess') || p.contains('food') || p.contains('lunch') || p.contains('dinner')) {
+            reply = '🍽️ Today’s Lunch: Paneer Butter Masala, Dal Tadka, Jeera Rice, and Tandoori Roti. Dinner starts at 07:45 PM!';
+          } else if (p.contains('leave') || p.contains('gate') || p.contains('curfew') || p.contains('pass')) {
+            reply = '🚪 Curfew is 10:00 PM. You have 1 approved leave (GP-2026-98114). Present your digital QR pass at Gate 1 to Security Officer Khan.';
+          } else if (p.contains('fee') || p.contains('pay') || p.contains('rent')) {
+            reply = '💳 You have 1 pending Mess Fee ($420.00) due on Nov 25. You can pay via the Fee Tracker tab with instant digital receipt generation.';
+          } else if (p.contains('complaint') || p.contains('leak') || p.contains('fan') || p.contains('repair')) {
+            reply = '🛠️ Complaint Status: Your plumbing complaint in B-204 is marked IN PROGRESS and assigned to Marcus Fixer.';
+          } else if (p.contains('room') || p.contains('recommend')) {
+            reply = '🛏️ AI Recommendation: For quiet study zones, Aryabhata Block 1st floor corner rooms are top-rated for Year 3 CS students.';
+          } else {
+            reply = `🤖 StaySync AI: I received your query regarding "${userMsg}". How else can I assist your hostel stay today?`;
+          }
+
+          setAiMessages(prev => [...prev, { sender: 'ai', text: reply }]);
+          setIsAiLoading(false);
+        }, 600);
+      };
+
+      // Render Dashboard based on role
+      return (
+        <div className="flex flex-col min-h-screen">
+          {/* Top Bar */}
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+              {/* Brand Logo */}
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-extrabold text-xl tracking-tight text-slate-900">Stay<span className="text-indigo-600">Sync</span></span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">v2.4 Live</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Hostel Management Ecosystem</p>
+                </div>
+              </div>
+
+              {/* Role Switcher Demo Dropdown */}
+              <div className="flex items-center space-x-3">
+                <div className="hidden sm:flex items-center space-x-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                  <span className="text-xs font-medium text-slate-600 px-2 flex items-center">
+                    <svg className="w-3.5 h-3.5 mr-1 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    Role:
+                  </span>
+                  <select 
+                    value={currentUser.id} 
+                    onChange={(e) => switchRole(e.target.value)}
+                    className="text-xs font-semibold bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="1">Student (Alex Rivers)</option>
+                    <option value="2">Student 2 (Sarah Chen)</option>
+                    <option value="3">Warden (Dr. Robert Sharma)</option>
+                    <option value="4">Administrator (Dean Eleanor)</option>
+                    <option value="5">Maintenance (Marcus Fixer)</option>
+                    <option value="6">Security (Officer Vikram Khan)</option>
+                  </select>
+                </div>
+
+                {/* AI Assistant Button */}
+                <button 
+                  onClick={() => setIsAiOpen(true)}
+                  className="flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-sm transition active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  <span>StaySync AI</span>
+                </button>
+
+                {/* Profile Pill */}
+                <div className="flex items-center space-x-2 pl-2 border-l border-slate-200">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 border border-indigo-300 flex items-center justify-center font-bold text-xs text-indigo-700">
+                    {currentUser.name.split(' ').map(n=>n[0]).join('')}
+                  </div>
+                  <div className="hidden md:block text-left">
+                    <div className="text-xs font-bold text-slate-800 leading-tight">{currentUser.name}</div>
+                    <div className="text-[10px] font-medium text-indigo-600">{currentUser.role}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Broadcast Notification Alert Bar */}
+          {emergencyBroadcast && (
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs font-medium text-amber-900 flex items-center justify-between">
+              <div className="max-w-7xl mx-auto flex items-center space-x-2">
+                <span className="animate-pulse flex h-2 w-2 rounded-full bg-amber-500"></span>
+                <span>{emergencyBroadcast}</span>
+              </div>
+              <button onClick={() => setEmergencyBroadcast(null)} className="text-amber-700 hover:text-amber-900 font-bold ml-4">✕</button>
+            </div>
+          )}
+
+          {/* Toast Notification */}
+          {notificationAlert && (
+            <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-2 animate-bounce">
+              <span className="text-emerald-400 font-bold">✓</span>
+              <span>{notificationAlert}</span>
+            </div>
+          )}
+
+          {/* Main Dashboard Layout */}
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+            {currentUser.role === 'STUDENT' && (
+              <StudentDashboard 
+                user={currentUser} 
+                fees={fees.filter(f => f.studentId === currentUser.id)}
+                allFees={fees}
+                setFees={setFees}
+                complaints={complaints.filter(c => c.studentId === currentUser.id)}
+                allComplaints={complaints}
+                setComplaints={setComplaints}
+                leaves={leaves.filter(l => l.studentId === currentUser.id)}
+                setLeaves={setLeaves}
+                messMenus={MESS_MENUS}
+                showToast={showToast}
+                setShowGatePassModal={setShowGatePassModal}
+                setReceiptModal={setReceiptModal}
+                setIsAiOpen={setIsAiOpen}
+              />
+            )}
+
+            {currentUser.role === 'WARDEN' && (
+              <WardenDashboard 
+                user={currentUser}
+                rooms={rooms}
+                setRooms={setRooms}
+                leaves={leaves}
+                setLeaves={setLeaves}
+                complaints={complaints}
+                setComplaints={setComplaints}
+                visitors={visitors}
+                showToast={showToast}
+                setEmergencyBroadcast={setEmergencyBroadcast}
+              />
+            )}
+
+            {currentUser.role === 'ADMINISTRATOR' && (
+              <AdminDashboard 
+                user={currentUser}
+                users={users}
+                setUsers={setUsers}
+                rooms={rooms}
+                fees={fees}
+                complaints={complaints}
+                leaves={leaves}
+                showToast={showToast}
+              />
+            )}
+
+            {currentUser.role === 'MAINTENANCE' && (
+              <MaintenanceDashboard 
+                user={currentUser}
+                complaints={complaints}
+                setComplaints={setComplaints}
+                showToast={showToast}
+              />
+            )}
+
+            {currentUser.role === 'SECURITY' && (
+              <SecurityDashboard 
+                user={currentUser}
+                leaves={leaves}
+                setLeaves={setLeaves}
+                visitors={visitors}
+                setVisitors={setVisitors}
+                showToast={showToast}
+              />
+            )}
+          </main>
+
+          {/* AI Floating Drawer */}
+          {isAiOpen && (
+            <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/40 backdrop-blur-sm flex justify-end animate-fadeIn">
+              <div className="w-full max-w-md bg-white shadow-2xl h-full flex flex-col justify-between">
+                {/* AI Header */}
+                <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center font-bold">⚡</div>
+                    <div>
+                      <h3 className="font-bold text-sm">StaySync AI Assistant</h3>
+                      <p className="text-[10px] text-indigo-100">Powered by Groq Llama-3.3-70b</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsAiOpen(false)} className="text-white/80 hover:text-white font-bold p-1">✕</button>
+                </div>
+
+                {/* AI Chat History */}
+                <div className="p-4 flex-1 overflow-y-auto space-y-3 text-xs">
+                  {aiMessages.map((m, idx) => (
+                    <div key={idx} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 leading-relaxed shadow-sm ${
+                        m.sender === 'user' 
+                          ? 'bg-indigo-600 text-white rounded-br-none' 
+                          : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'
+                      }`}>
+                        {m.text}
+                      </div>
+                    </div>
+                  ))}
+                  {isAiLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-slate-100 text-slate-500 rounded-2xl px-3.5 py-2 text-xs animate-pulse">
+                        StaySync AI is thinking...
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Quick Prompt Chips */}
+                <div className="px-4 py-2 border-t border-slate-100 flex items-center space-x-1.5 overflow-x-auto text-[11px]">
+                  <button onClick={() => setAiInput("What is today's mess menu?")} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 whitespace-nowrap">🍽️ Today's Mess</button>
+                  <button onClick={() => setAiInput("How do I get a Gate Pass?")} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 whitespace-nowrap">🚪 Gate Pass</button>
+                  <button onClick={() => setAiInput("When is hostel fee due?")} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 whitespace-nowrap">💳 Fee Due</button>
+                  <button onClick={() => setAiInput("Recommend best quiet room")} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 whitespace-nowrap">🛏️ Quiet Rooms</button>
+                </div>
+
+                {/* AI Input Form */}
+                <form onSubmit={sendAiMessage} className="p-3 border-t border-slate-200 bg-slate-50 flex items-center space-x-2">
+                  <input 
+                    type="text" 
+                    value={aiInput} 
+                    onChange={(e) => setAiInput(e.target.value)}
+                    placeholder="Ask StaySync AI anything..."
+                    className="flex-1 text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2.5 text-xs font-semibold">
+                    Send
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* QR Gate Pass Modal */}
+          {showGatePassModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 font-bold text-xl">
+                  ✓
+                </div>
+                <h3 className="font-bold text-lg text-slate-900">Official Campus Gate Pass</h3>
+                <p className="text-xs text-slate-500 mt-1">Authorized by Chief Warden Office</p>
+
+                <div className="my-5 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col items-center">
+                  <div id="qrcode-container" className="p-2 bg-white rounded-lg shadow-sm">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${showGatePassModal.gatePass}`} 
+                      alt="QR Code" 
+                      className="w-36 h-36"
+                    />
+                  </div>
+                  <div className="font-mono font-bold text-sm text-indigo-700 mt-3">{showGatePassModal.gatePass}</div>
+                  <div className="text-[11px] text-slate-500">{showGatePassModal.studentName} • Room {showGatePassModal.room}</div>
+                </div>
+
+                <div className="text-left text-xs bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 space-y-1 mb-4">
+                  <div className="flex justify-between"><span className="text-slate-500">Purpose:</span> <span className="font-semibold text-slate-800">{showGatePassModal.reason}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Destination:</span> <span className="font-semibold text-slate-800">{showGatePassModal.destination}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Expected Return:</span> <span className="font-semibold text-slate-800">{showGatePassModal.to}</span></div>
+                </div>
+
+                <button 
+                  onClick={() => setShowGatePassModal(null)}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-semibold"
+                >
+                  Close Pass
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Receipt Modal */}
+          {receiptModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+                <div className="flex justify-between items-start border-b border-slate-200 pb-4">
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900">StaySync Hostel E-Receipt</h3>
+                    <p className="text-xs text-slate-500">Receipt ID: {receiptModal.receipt}</p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">PAID</span>
+                </div>
+
+                <div className="py-4 space-y-2 text-xs">
+                  <div className="flex justify-between"><span className="text-slate-500">Student:</span> <span className="font-semibold">{currentUser.name}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Room & Bed:</span> <span className="font-semibold">{currentUser.room} ({currentUser.bed})</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Fee Particular:</span> <span className="font-semibold">{receiptModal.type}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Transaction Ref:</span> <span className="font-mono text-slate-700">{receiptModal.ref}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Payment Date:</span> <span className="font-semibold">{receiptModal.paidDate}</span></div>
+                  <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-sm text-slate-900">
+                    <span>Total Amount Paid:</span>
+                    <span className="text-indigo-600">${receiptModal.amount.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2 pt-2">
+                  <button 
+                    onClick={() => { window.print(); }} 
+                    className="flex-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 py-2 rounded-xl text-xs font-semibold"
+                  >
+                    🖨️ Print Receipt
+                  </button>
+                  <button 
+                    onClick={() => setReceiptModal(null)} 
+                    className="flex-1 bg-slate-900 text-white hover:bg-slate-800 py-2 rounded-xl text-xs font-semibold"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer */}
+          <footer className="bg-white border-t border-slate-200 py-4 mt-auto">
+            <div className="max-w-7xl mx-auto px-4 text-center text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between">
+              <div>StaySync™ • Enterprise Hostel Management & Resident Experience Platform</div>
+              <div className="mt-2 sm:mt-0 flex items-center space-x-4">
+                <span className="text-emerald-600 font-medium flex items-center">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1"></span>
+                  API Backend Active: http://localhost:8080
+                </span>
+                <span>Security Protocol: RBAC Enabled</span>
+              </div>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 1. STUDENT DASHBOARD
+    // ==========================================
+    function StudentDashboard({ user, fees, allFees, setFees, complaints, allComplaints, setComplaints, leaves, setLeaves, messMenus, showToast, setShowGatePassModal, setReceiptModal, setIsAiOpen }) {
+      const [studentTab, setStudentTab] = useState('overview');
+
+      // Complaint Form State
+      const [compTitle, setCompTitle] = useState('');
+      const [compDesc, setCompDesc] = useState('');
+      const [compCat, setCompCat] = useState('PLUMBING');
+      const [compPriority, setCompPriority] = useState('MEDIUM');
+      const [aiDetection, setAiDetection] = useState(null);
+
+      // Leave Form State
+      const [leaveType, setLeaveType] = useState('HOME_VISIT');
+      const [leaveFrom, setLeaveFrom] = useState('');
+      const [leaveTo, setLeaveTo] = useState('');
+      const [leaveReason, setLeaveReason] = useState('');
+      const [destAddress, setDestAddress] = useState('');
+      const [parentContact, setParentContact] = useState('+1-555-9901');
+
+      // Instant AI Analyzer when typing complaint
+      useEffect(() => {
+        const text = (compTitle + " " + compDesc).toLowerCase();
+        if (text.length > 5) {
+          if (text.includes('leak') || text.includes('water') || text.includes('pipe') || text.includes('tap') || text.includes('sink')) {
+            setAiDetection({ category: 'PLUMBING', priority: text.includes('burst') || text.includes('flood') ? 'URGENT' : 'HIGH', reason: 'Water leakage detected. Fast-tracked for plumbing team.' });
+            setCompCat('PLUMBING');
+            if (text.includes('burst') || text.includes('flood')) setCompPriority('URGENT');
+          } else if (text.includes('spark') || text.includes('shock') || text.includes('smoke')) {
+            setAiDetection({ category: 'ELECTRICAL', priority: 'URGENT', reason: 'Safety critical! Electrical hazard detected.' });
+            setCompCat('ELECTRICAL');
+            setCompPriority('URGENT');
+          } else if (text.includes('fan') || text.includes('light') || text.includes('switch') || text.includes('ac')) {
+            setAiDetection({ category: 'ELECTRICAL', priority: 'MEDIUM', reason: 'Appliance component issue.' });
+            setCompCat('ELECTRICAL');
+          } else if (text.includes('wifi') || text.includes('lan') || text.includes('internet')) {
+            setAiDetection({ category: 'WIFI_NETWORK', priority: 'MEDIUM', reason: 'Network connectivity ticket.' });
+            setCompCat('WIFI_NETWORK');
+          } else {
+            setAiDetection(null);
+          }
+        } else {
+          setAiDetection(null);
+        }
+      }, [compTitle, compDesc]);
+
+      // Pay Fee Handler
+      const handlePayFee = (feeId) => {
+        const updated = allFees.map(f => {
+          if (f.id === feeId) {
+            const paid = {
+              ...f,
+              status: 'PAID',
+              paidDate: new Date().toISOString().split('T')[0],
+              ref: 'TXN-' + Math.floor(100000 + Math.random() * 900000),
+              receipt: 'REC-2026-' + Math.floor(1000 + Math.random() * 9000)
+            };
+            setReceiptModal(paid);
+            return paid;
+          }
+          return f;
+        });
+        setFees(updated);
+        showToast("Payment processed successfully! E-Receipt generated.");
+      };
+
+      // Submit Complaint
+      const handleComplaintSubmit = (e) => {
+        e.preventDefault();
+        if (!compTitle || !compDesc) return;
+
+        const newComplaint = {
+          id: Date.now(),
+          studentId: user.id,
+          studentName: user.name,
+          room: user.room,
+          title: compTitle,
+          description: compDesc,
+          category: compCat,
+          priority: compPriority,
+          aiPredicted: aiDetection ? aiDetection.category : compCat,
+          status: 'SUBMITTED',
+          assignee: 'Marcus Fixer',
+          notes: null,
+          date: new Date().toISOString().split('T')[0]
+        };
+
+        setComplaints([newComplaint, ...allComplaints]);
+        setCompTitle('');
+        setCompDesc('');
+        setAiDetection(null);
+        showToast("Complaint submitted! Assigned to Maintenance Technician.");
+      };
+
+      // Submit Leave
+      const handleLeaveSubmit = (e) => {
+        e.preventDefault();
+        if (!leaveFrom || !leaveTo || !leaveReason) return;
+
+        const newLeave = {
+          id: Date.now(),
+          studentId: user.id,
+          studentName: user.name,
+          room: user.room,
+          type: leaveType,
+          from: leaveFrom,
+          to: leaveTo,
+          reason: leaveReason,
+          destination: destAddress || 'Home Address',
+          parentContact: parentContact,
+          status: 'PENDING',
+          wardenRemarks: null,
+          gatePass: null
+        };
+
+        setLeaves(prev => [newLeave, ...prev]);
+        setLeaveFrom('');
+        setLeaveTo('');
+        setLeaveReason('');
+        setDestAddress('');
+        showToast("Leave application submitted for Warden review!");
+      };
+
+      const pendingFeesCount = fees.filter(f => f.status !== 'PAID').length;
+      const approvedPasses = leaves.filter(l => l.status === 'APPROVED');
+
+      return (
+        <div className="space-y-6">
+          {/* Welcome Banner */}
+          <div className="bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">Student Portal</span>
+                <span className="text-indigo-200 text-xs">Hostel ID: STU-2024-889</span>
+              </div>
+              <h1 className="text-2xl font-extrabold tracking-tight mt-1">Welcome back, {user.name}!</h1>
+              <p className="text-indigo-100 text-xs mt-1">
+                Room <strong className="text-white underline">{user.room}</strong> (Bed {user.bed}) • Bhabha Block (West) • {user.dept} (Year {user.year})
+              </p>
+            </div>
+            <div className="mt-4 md:mt-0 flex items-center space-x-2">
+              <button onClick={() => setIsAiOpen(true)} className="bg-white text-indigo-700 hover:bg-indigo-50 font-bold px-4 py-2 rounded-xl text-xs shadow-md transition">
+                ⚡ Ask StaySync AI
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Pills */}
+          <div className="flex space-x-2 overflow-x-auto border-b border-slate-200 pb-2 text-xs font-semibold">
+            {[
+              { id: 'overview', label: '🏠 Overview & Room' },
+              { id: 'fees', label: `💳 Fee Tracker (${pendingFeesCount} Pending)` },
+              { id: 'complaints', label: `🛠️ Complaints (${complaints.length})` },
+              { id: 'leaves', label: `🚪 Leave & Gate Pass (${approvedPasses.length} Active)` },
+              { id: 'mess', label: '🍽️ Weekly Mess Menu' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setStudentTab(tab.id)}
+                className={`px-4 py-2 rounded-xl transition ${studentTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* TAB 1: OVERVIEW & ROOM */}
+          {studentTab === 'overview' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Room Card */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-sm text-slate-900">Room Details</h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700">DOUBLE SHARING</span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between"><span className="text-slate-500">Room Number:</span> <span className="font-bold text-slate-800">{user.room}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Allocated Bed:</span> <span className="font-bold text-indigo-600">{user.bed}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Block & Wing:</span> <span className="font-semibold text-slate-800">Bhabha Block, 2nd Floor</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Roommate:</span> <span className="font-semibold text-slate-800">Sarah Chen (Bed B-2)</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">Amenities:</span> <span className="text-slate-600">LAN, Ceiling Fan, Desks, Attached Balcony</span></div>
+                </div>
+                <div className="pt-2">
+                  <button onClick={() => setStudentTab('complaints')} className="w-full text-center text-xs font-semibold py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-700">
+                    Report Room Issue
+                  </button>
+                </div>
+              </div>
+
+              {/* Fee Quick Status */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-sm text-slate-900">Fee Status Summary</h3>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${pendingFeesCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                    {pendingFeesCount > 0 ? `${pendingFeesCount} DUES` : 'ALL CLEAR'}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {fees.slice(0, 2).map(f => (
+                    <div key={f.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
+                      <div>
+                        <div className="font-bold text-slate-800">{f.type}</div>
+                        <div className="text-[10px] text-slate-500">Due: {f.dueDate}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-slate-900">${f.amount.toFixed(2)}</div>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${f.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {f.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setStudentTab('fees')} className="w-full text-center text-xs font-semibold py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl">
+                  Open Fee Tracker →
+                </button>
+              </div>
+
+              {/* Active Gate Pass Card */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 className="font-bold text-sm text-slate-900">Current Gate Pass</h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">VALID</span>
+                </div>
+                {approvedPasses.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-xs space-y-1.5">
+                      <div className="flex justify-between font-bold text-emerald-900">
+                        <span>{approvedPasses[0].gatePass}</span>
+                        <span className="text-[10px] bg-emerald-200 px-1.5 py-0.5 rounded">APPROVED</span>
+                      </div>
+                      <div className="text-slate-600 text-[11px]">{approvedPasses[0].reason}</div>
+                      <div className="text-[10px] text-slate-500">Return by: {approvedPasses[0].to}</div>
+                    </div>
+                    <button 
+                      onClick={() => setShowGatePassModal(approvedPasses[0])}
+                      className="w-full text-center text-xs font-semibold py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm"
+                    >
+                      📱 Show QR Gate Pass
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-xs text-slate-400">
+                    No active gate pass currently. Apply below.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: FEE TRACKER */}
+          {studentTab === 'fees' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Student Fee Management</h2>
+                  <p className="text-xs text-slate-500">Track and pay hostel room, mess, and maintenance dues with instant verification.</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[10px] border-y border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Fee Particular</th>
+                      <th className="py-3 px-4">Amount</th>
+                      <th className="py-3 px-4">Due Date</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Receipt / Ref</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {fees.map(f => (
+                      <tr key={f.id} className="hover:bg-slate-50/70">
+                        <td className="py-3 px-4 font-bold text-slate-800">{f.type}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-900">${f.amount.toFixed(2)}</td>
+                        <td className="py-3 px-4 text-slate-600">{f.dueDate}</td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            f.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' :
+                            f.status === 'OVERDUE' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {f.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                          {f.receipt || '-'}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {f.status === 'PAID' ? (
+                            <button 
+                              onClick={() => setReceiptModal(f)}
+                              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs"
+                            >
+                              📄 View Receipt
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handlePayFee(f.id)}
+                              className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs shadow-sm transition active:scale-95"
+                            >
+                              Pay Now
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: COMPLAINTS */}
+          {studentTab === 'complaints' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Form */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                <h3 className="font-bold text-sm text-slate-900 flex items-center space-x-1.5">
+                  <span>🛠️ Lodge a New Complaint</span>
+                </h3>
+                <form onSubmit={handleComplaintSubmit} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Issue Title</label>
+                    <input 
+                      type="text" 
+                      value={compTitle} 
+                      onChange={e => setCompTitle(e.target.value)}
+                      placeholder="e.g. Washbasin pipe leaking"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Description & Details</label>
+                    <textarea 
+                      rows="3" 
+                      value={compDesc} 
+                      onChange={e => setCompDesc(e.target.value)}
+                      placeholder="Explain where and how severe the issue is..."
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* AI Instant Categorizer Badge */}
+                  {aiDetection && (
+                    <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-1">
+                      <div className="flex items-center space-x-1 text-purple-800 font-bold text-[11px]">
+                        <span>⚡ AI Categorization:</span>
+                        <span className="bg-purple-200 px-1.5 py-0.5 rounded">{aiDetection.category}</span>
+                        <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{aiDetection.priority}</span>
+                      </div>
+                      <p className="text-[10px] text-purple-700">{aiDetection.reason}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Category</label>
+                      <select 
+                        value={compCat} 
+                        onChange={e => setCompCat(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50"
+                      >
+                        <option value="PLUMBING">Plumbing</option>
+                        <option value="ELECTRICAL">Electrical</option>
+                        <option value="FURNITURE">Furniture</option>
+                        <option value="CLEANING">Cleaning</option>
+                        <option value="WIFI_NETWORK">WiFi / Network</option>
+                        <option value="OTHER">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Priority</label>
+                      <select 
+                        value={compPriority} 
+                        onChange={e => setCompPriority(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50"
+                      >
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="URGENT">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl shadow-sm transition">
+                    Submit Complaint
+                  </button>
+                </form>
+              </div>
+
+              {/* Complaints List */}
+              <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+                <h3 className="font-bold text-sm text-slate-900">Your Lodged Complaints ({complaints.length})</h3>
+                <div className="space-y-3">
+                  {complaints.map(c => (
+                    <div key={c.id} className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition text-xs space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-bold text-slate-900 text-sm">{c.title}</div>
+                          <div className="text-[11px] text-slate-500">Lodged on {c.date} • Room {c.room}</div>
+                        </div>
+                        <div className="flex space-x-1.5">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            c.priority === 'URGENT' ? 'bg-red-100 text-red-800' :
+                            c.priority === 'HIGH' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {c.priority}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            c.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' :
+                            c.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {c.status}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-slate-700">{c.description}</p>
+                      {c.notes && (
+                        <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-[11px] text-slate-600">
+                          <strong className="text-slate-800">Technician Note ({c.assignee}):</strong> {c.notes}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: LEAVE & GATE PASS */}
+          {studentTab === 'leaves' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Apply Form */}
+              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
+                <h3 className="font-bold text-sm text-slate-900">Apply for Hostel Leave</h3>
+                <form onSubmit={handleLeaveSubmit} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Leave Category</label>
+                    <select 
+                      value={leaveType} 
+                      onChange={e => setLeaveType(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50"
+                    >
+                      <option value="HOME_VISIT">Home Visit</option>
+                      <option value="ACADEMIC_CONFERENCE">Academic / Conference</option>
+                      <option value="MEDICAL">Medical Emergency</option>
+                      <option value="VACATION">Vacation Outing</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Departure Time</label>
+                      <input 
+                        type="datetime-local" 
+                        value={leaveFrom} 
+                        onChange={e => setLeaveFrom(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-2 py-2 bg-slate-50 text-[11px]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 font-medium mb-1">Return Time</label>
+                      <input 
+                        type="datetime-local" 
+                        value={leaveTo} 
+                        onChange={e => setLeaveTo(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-2 py-2 bg-slate-50 text-[11px]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Reason for Leave</label>
+                    <textarea 
+                      rows="2" 
+                      value={leaveReason} 
+                      onChange={e => setLeaveReason(e.target.value)}
+                      placeholder="e.g. Sibling wedding, Diwali holidays..."
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Destination Address</label>
+                    <input 
+                      type="text" 
+                      value={destAddress} 
+                      onChange={e => setDestAddress(e.target.value)}
+                      placeholder="City, home address..."
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 font-medium mb-1">Parent Emergency Phone</label>
+                    <input 
+                      type="text" 
+                      value={parentContact} 
+                      onChange={e => setParentContact(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-slate-50"
+                    />
+                  </div>
+
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl shadow-sm">
+                    Submit for Warden Approval
+                  </button>
+                </form>
+              </div>
+
+              {/* Applications List */}
+              <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+                <h3 className="font-bold text-sm text-slate-900">Leave Applications & Passes</h3>
+                <div className="space-y-3">
+                  {leaves.map(l => (
+                    <div key={l.id} className="p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-bold text-slate-900 text-sm">{l.reason}</div>
+                          <div className="text-[11px] text-slate-500">{l.type} • {l.from} to {l.to}</div>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                          l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
+                          l.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {l.status}
+                        </span>
+                      </div>
+                      <div className="text-slate-600">Destination: {l.destination}</div>
+                      {l.wardenRemarks && (
+                        <div className="bg-slate-50 p-2 rounded text-[11px] text-slate-600">
+                          <strong>Warden:</strong> {l.wardenRemarks}
+                        </div>
+                      )}
+                      {l.status === 'APPROVED' && l.gatePass && (
+                        <div className="pt-2 flex justify-between items-center">
+                          <span className="font-mono font-bold text-indigo-700">{l.gatePass}</span>
+                          <button 
+                            onClick={() => setShowGatePassModal(l)}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs"
+                          >
+                            Show Gate Pass QR
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: MESS MENU */}
+          {studentTab === 'mess' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Hostel Mess Menu Schedule</h2>
+                <p className="text-xs text-slate-500">Freshly prepared nutritious meals curated by hostel dietary team.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {messMenus.map((m, idx) => (
+                  <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-slate-900 text-sm">{m.day} • {m.meal}</span>
+                      <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{m.time}</span>
+                    </div>
+                    <p className="text-slate-700">{m.items}</p>
+                    <div className="text-[10px] text-slate-500 font-medium">Approx. {m.cal} Calories</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 2. WARDEN DASHBOARD
+    // ==========================================
+    function WardenDashboard({ user, rooms, setRooms, leaves, setLeaves, complaints, setComplaints, visitors, showToast, setEmergencyBroadcast }) {
+      const [wardenTab, setWardenTab] = useState('leaves');
+      const [alertInput, setAlertInput] = useState('');
+      const [selectedRoom, setSelectedRoom] = useState(null);
+
+      // Approve / Reject Leave
+      const handleReviewLeave = (leaveId, approved) => {
+        const updated = leaves.map(l => {
+          if (l.id === leaveId) {
+            return {
+              ...l,
+              status: approved ? 'APPROVED' : 'REJECTED',
+              wardenRemarks: approved ? 'Approved by Dr. Robert Sharma (Phone verified)' : 'Denied due to campus attendance requirement',
+              gatePass: approved ? 'GP-2026-' + Math.floor(10000 + Math.random() * 90000) : null
+            };
+          }
+          return l;
+        });
+        setLeaves(updated);
+        showToast(approved ? "Leave approved! Digital Gate Pass generated." : "Leave application rejected.");
+      };
+
+      // Assign complaint to technician
+      const handleAssignComplaint = (complaintId, technician) => {
+        setComplaints(prev => prev.map(c => c.id === complaintId ? { ...c, assignee: technician, status: 'IN_PROGRESS' } : c));
+        showToast(`Complaint assigned to ${technician}`);
+      };
+
+      const broadcastNotice = (e) => {
+        e.preventDefault();
+        if (!alertInput) return;
+        setEmergencyBroadcast(alertInput);
+        setAlertInput('');
+        showToast("Urgent broadcast banner published to all residents!");
+      };
+
+      const pendingLeaves = leaves.filter(l => l.status === 'PENDING');
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center">
+            <div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-300 border border-indigo-400/30">Chief Warden Console</span>
+              <h1 className="text-2xl font-extrabold tracking-tight mt-1">Hostel Warden Portal</h1>
+              <p className="text-slate-400 text-xs mt-1">Supervising Blocks: Aryabhata, Bhabha & Curie Wings • 420 Residents</p>
+            </div>
+            <div className="mt-4 md:mt-0 flex space-x-2 text-xs">
+              <span className="bg-amber-500/20 text-amber-300 px-3 py-1.5 rounded-xl border border-amber-500/30 font-semibold">
+                {pendingLeaves.length} Pending Leave Approvals
+              </span>
+            </div>
+          </div>
+
+          {/* Navigation Pills */}
+          <div className="flex space-x-2 border-b border-slate-200 pb-2 text-xs font-semibold">
+            {[
+              { id: 'leaves', label: `🚪 Leave Approvals (${pendingLeaves.length})` },
+              { id: 'occupancy', label: '🛏️ Room Occupancy Grid' },
+              { id: 'complaints', label: `🛠️ Complaints Escalation (${complaints.length})` },
+              { id: 'broadcast', label: '📢 Emergency Alerts' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setWardenTab(tab.id)}
+                className={`px-4 py-2 rounded-xl transition ${wardenTab === tab.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* TAB 1: LEAVES APPROVAL */}
+          {wardenTab === 'leaves' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-slate-900">Student Leave & Night Outing Requests</h2>
+              <div className="space-y-3">
+                {leaves.map(l => (
+                  <div key={l.id} className="p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center text-xs gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <strong className="text-sm text-slate-900">{l.studentName}</strong>
+                        <span className="text-slate-500">• Room {l.room}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">{l.type}</span>
+                      </div>
+                      <div className="text-slate-700">{l.reason} (Destination: {l.destination})</div>
+                      <div className="text-[11px] text-slate-500">Departure: {l.from} ➔ Return: {l.to} • Parent: {l.parentContact}</div>
+                      {l.wardenRemarks && <div className="text-indigo-600 text-[11px] font-medium">Remarks: {l.wardenRemarks}</div>}
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {l.status === 'PENDING' ? (
+                        <>
+                          <button 
+                            onClick={() => handleReviewLeave(l.id, true)} 
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-1.5 rounded-lg text-xs"
+                          >
+                            Approve & Issue Pass
+                          </button>
+                          <button 
+                            onClick={() => handleReviewLeave(l.id, false)} 
+                            className="bg-red-50 hover:bg-red-100 text-red-700 font-semibold px-3 py-1.5 rounded-lg text-xs"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${l.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+                          {l.status} {l.gatePass ? `(${l.gatePass})` : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: ROOM OCCUPANCY */}
+          {wardenTab === 'occupancy' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-base font-bold text-slate-900">Hostel Room & Bed Allocation Grid</h2>
+                <span className="text-xs text-slate-500">6 Sample Units Shown</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {rooms.map(r => (
+                  <div key={r.id} className="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 transition space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-sm text-slate-900">Room {r.roomNumber}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${r.status === 'FULL' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                        {r.status}
+                      </span>
+                    </div>
+                    <div className="text-slate-600">{r.block} • Floor {r.floor}</div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Occupancy:</span>
+                      <span className="font-semibold text-slate-800">{r.occupied} / {r.capacity} Beds</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Monthly Rent:</span>
+                      <span className="font-semibold text-slate-800">${r.rent}</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full ${r.occupied === r.capacity ? 'bg-red-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${(r.occupied / r.capacity) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: COMPLAINTS */}
+          {wardenTab === 'complaints' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-slate-900">Maintenance Tickets & Escalations</h2>
+              <div className="space-y-3">
+                {complaints.map(c => (
+                  <div key={c.id} className="p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center text-xs gap-3">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <strong className="text-slate-900 text-sm">{c.title}</strong>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100">{c.category}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${c.priority === 'URGENT' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>{c.priority}</span>
+                      </div>
+                      <div className="text-slate-600 mt-1">{c.description}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">By {c.studentName} ({c.room}) • Current Tech: {c.assignee}</div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={() => handleAssignComplaint(c.id, 'Marcus Fixer')}
+                        className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg text-xs"
+                      >
+                        Assign Marcus
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: EMERGENCY BROADCAST */}
+          {wardenTab === 'broadcast' && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 max-w-xl">
+              <h2 className="text-base font-bold text-slate-900">Broadcast Campus Notice to All Residents</h2>
+              <p className="text-xs text-slate-500">Pushes a persistent alert banner across every resident's dashboard.</p>
+              <form onSubmit={broadcastNotice} className="space-y-3 text-xs">
+                <textarea 
+                  rows="3" 
+                  value={alertInput} 
+                  onChange={e => setAlertInput(e.target.value)}
+                  placeholder="e.g. Water tank cleaning tomorrow morning from 09:00 to 11:00 AM..."
+                  className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 focus:bg-white"
+                />
+                <button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl text-xs shadow-sm">
+                  Publish Urgent Notice
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 3. ADMINISTRATOR DASHBOARD
+    // ==========================================
+    function AdminDashboard({ user, users, setUsers, rooms, fees, complaints, leaves, showToast }) {
+      const [adminTab, setAdminTab] = useState('kpis');
+
+      const totalStudents = users.filter(u => u.role === 'STUDENT').length;
+      const totalCollected = fees.filter(f => f.status === 'PAID').reduce((acc, c) => acc + c.amount, 0);
+      const totalPending = fees.filter(f => f.status !== 'PAID').reduce((acc, c) => acc + c.amount, 0);
+
+      const changeRole = (userId, newRole) => {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+        showToast(`User role updated to ${newRole}`);
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/30 text-purple-300 border border-purple-400/30">System Administration</span>
+            <h1 className="text-2xl font-extrabold tracking-tight mt-1">Hostel Executive Overview</h1>
+            <p className="text-slate-400 text-xs mt-1">Financial Audits, Resident Accounts, Capacity Planning & RBAC Security</p>
+          </div>
+
+          {/* Metric Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-xs font-medium text-slate-500">Registered Students</div>
+              <div className="text-2xl font-extrabold text-slate-900 mt-1">{totalStudents}</div>
+              <div className="text-[10px] text-emerald-600 font-semibold mt-1">↑ Active in system</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-xs font-medium text-slate-500">Fees Collected</div>
+              <div className="text-2xl font-extrabold text-emerald-600 mt-1">${totalCollected.toFixed(2)}</div>
+              <div className="text-[10px] text-slate-400 mt-1">This semester</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-xs font-medium text-slate-500">Pending Dues</div>
+              <div className="text-2xl font-extrabold text-amber-600 mt-1">${totalPending.toFixed(2)}</div>
+              <div className="text-[10px] text-amber-700 font-semibold mt-1">Requires follow-up</div>
+            </div>
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="text-xs font-medium text-slate-500">Open Complaints</div>
+              <div className="text-2xl font-extrabold text-indigo-600 mt-1">{complaints.filter(c => c.status !== 'RESOLVED').length}</div>
+              <div className="text-[10px] text-slate-400 mt-1">In progress</div>
+            </div>
+          </div>
+
+          {/* User Management Table */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-base font-bold text-slate-900">User Role-Based Access Control (RBAC)</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[10px] border-y border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">User</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Current Role</th>
+                    <th className="py-3 px-4">Assigned Location</th>
+                    <th className="py-3 px-4">Change Role</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {users.map(u => (
+                    <tr key={u.id} className="hover:bg-slate-50/70">
+                      <td className="py-3 px-4 font-bold text-slate-800">{u.name}</td>
+                      <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{u.email}</td>
+                      <td className="py-3 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">{u.room || '-'}</td>
+                      <td className="py-3 px-4">
+                        <select 
+                          value={u.role}
+                          onChange={(e) => changeRole(u.id, e.target.value)}
+                          className="text-[11px] border border-slate-200 rounded px-2 py-1 bg-white"
+                        >
+                          <option value="STUDENT">STUDENT</option>
+                          <option value="WARDEN">WARDEN</option>
+                          <option value="ADMINISTRATOR">ADMINISTRATOR</option>
+                          <option value="MAINTENANCE">MAINTENANCE</option>
+                          <option value="SECURITY">SECURITY</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 4. MAINTENANCE DASHBOARD
+    // ==========================================
+    function MaintenanceDashboard({ user, complaints, setComplaints, showToast }) {
+      const [filter, setFilter] = useState('ALL');
+
+      const updateTicketStatus = (id, newStatus) => {
+        setComplaints(prev => prev.map(c => c.id === id ? { ...c, status: newStatus, notes: newStatus === 'RESOLVED' ? 'Repairs completed & tested by Marcus Fixer' : 'Work started, diagnostic done' } : c));
+        showToast(`Complaint status changed to ${newStatus}`);
+      };
+
+      const filtered = complaints.filter(c => filter === 'ALL' || c.priority === filter);
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-amber-900 text-white rounded-3xl p-6 shadow-xl flex justify-between items-center">
+            <div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/30 text-amber-300 border border-amber-400/30">Facilities & Repairs</span>
+              <h1 className="text-2xl font-extrabold tracking-tight mt-1">Maintenance Technician Workbench</h1>
+              <p className="text-amber-200 text-xs mt-1">Active Staff: Marcus Fixer • Electrical, Plumbing & Carpentry Work Orders</p>
+            </div>
+          </div>
+
+          <div className="flex space-x-2 text-xs font-semibold">
+            {['ALL', 'URGENT', 'HIGH', 'MEDIUM', 'LOW'].map(lvl => (
+              <button 
+                key={lvl}
+                onClick={() => setFilter(lvl)}
+                className={`px-3 py-1.5 rounded-xl border ${filter === lvl ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-700 border-slate-200'}`}
+              >
+                {lvl} Priority
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map(c => (
+              <div key={c.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3 text-xs">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">{c.title}</h3>
+                    <p className="text-[11px] text-slate-500">Room {c.room} • Reported by {c.studentName}</p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    c.priority === 'URGENT' ? 'bg-red-100 text-red-800' :
+                    c.priority === 'HIGH' ? 'bg-orange-100 text-orange-800' : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {c.priority}
+                  </span>
+                </div>
+                <p className="text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100">{c.description}</p>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+                    {c.status}
+                  </span>
+                  <div className="flex space-x-2">
+                    {c.status !== 'IN_PROGRESS' && (
+                      <button onClick={() => updateTicketStatus(c.id, 'IN_PROGRESS')} className="px-3 py-1 bg-blue-50 text-blue-700 font-semibold rounded-lg">
+                        Mark In Progress
+                      </button>
+                    )}
+                    {c.status !== 'RESOLVED' && (
+                      <button onClick={() => updateTicketStatus(c.id, 'RESOLVED')} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-sm">
+                        Mark Resolved
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 5. SECURITY DASHBOARD
+    // ==========================================
+    function SecurityDashboard({ user, leaves, setLeaves, visitors, setVisitors, showToast }) {
+      const [tokenInput, setTokenInput] = useState('');
+      const [scanResult, setScanResult] = useState(null);
+
+      // Visitor Form
+      const [vName, setVName] = useState('');
+      const [vPhone, setVPhone] = useState('');
+      const [vIdType, setVIdType] = useState('Driving License');
+      const [vIdNumber, setVIdNumber] = useState('');
+      const [vStudent, setVStudent] = useState('Alex Rivers (B-204)');
+      const [vRelation, setVRelation] = useState('Parent');
+      const [vPurpose, setVPurpose] = useState('Meeting resident');
+
+      // Verify Gate Pass Token
+      const handleVerifyPass = (e) => {
+        e.preventDefault();
+        const found = leaves.find(l => l.gatePass && l.gatePass.toUpperCase() === tokenInput.trim().toUpperCase());
+        if (found) {
+          setScanResult(found);
+          showToast("Valid Gate Pass verified for " + found.studentName);
+        } else {
+          setScanResult({ error: "Invalid or Unapproved Gate Pass Token!" });
+        }
+      };
+
+      const handleGateAction = (action) => {
+        if (!scanResult || scanResult.error) return;
+        setLeaves(prev => prev.map(l => l.id === scanResult.id ? { ...l, status: action === 'CHECK_OUT' ? 'CHECKED_OUT' : 'CHECKED_IN' } : l));
+        showToast(`Student successfully ${action === 'CHECK_OUT' ? 'Checked Out through Gate 1' : 'Checked In Back to Campus'}`);
+        setScanResult(null);
+        setTokenInput('');
+      };
+
+      const handleAddVisitor = (e) => {
+        e.preventDefault();
+        if (!vName || !vPhone || !vIdNumber) return;
+
+        const newVisitor = {
+          id: Date.now(),
+          name: vName,
+          phone: vPhone,
+          idType: vIdType,
+          idNumber: vIdNumber,
+          studentName: vStudent,
+          relation: vRelation,
+          purpose: vPurpose,
+          inTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          outTime: null,
+          status: 'INSIDE'
+        };
+
+        setVisitors([newVisitor, ...visitors]);
+        setVName('');
+        setVPhone('');
+        setVIdNumber('');
+        showToast("Visitor entry logged! Badge issued.");
+      };
+
+      const handleVisitorExit = (id) => {
+        setVisitors(prev => prev.map(v => v.id === id ? { ...v, status: 'CHECKED_OUT', outTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } : v));
+        showToast("Visitor check-out completed.");
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl flex justify-between items-center">
+            <div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/30 text-emerald-300 border border-emerald-400/30">Gate 1 Security Operations</span>
+              <h1 className="text-2xl font-extrabold tracking-tight mt-1">Campus Gate Security Terminal</h1>
+              <p className="text-slate-400 text-xs mt-1">Officer Vikram Khan • Student Outing Verification & Visitor Registration</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Gate Pass Scanner */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-slate-900">Student Gate Pass Verifier</h2>
+              <p className="text-xs text-slate-500">Scan QR or enter student's Gate Pass token (e.g. <code>GP-2026-98114</code>)</p>
+
+              <form onSubmit={handleVerifyPass} className="flex space-x-2 text-xs">
+                <input 
+                  type="text" 
+                  value={tokenInput} 
+                  onChange={e => setTokenInput(e.target.value)}
+                  placeholder="Enter Gate Pass Token..."
+                  className="flex-1 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-mono font-bold"
+                />
+                <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-xl">
+                  Verify Pass
+                </button>
+              </form>
+
+              {scanResult && (
+                <div className={`p-4 rounded-xl border text-xs space-y-2 ${scanResult.error ? 'bg-red-50 border-red-200 text-red-800' : 'bg-emerald-50 border-emerald-200 text-emerald-900'}`}>
+                  {scanResult.error ? (
+                    <div className="font-bold">❌ {scanResult.error}</div>
+                  ) : (
+                    <>
+                      <div className="font-bold text-sm">✅ Verified Pass: {scanResult.studentName} ({scanResult.room})</div>
+                      <div>Reason: {scanResult.reason}</div>
+                      <div>Expected Return: {scanResult.to}</div>
+                      <div className="pt-2 flex space-x-2">
+                        <button onClick={() => handleGateAction('CHECK_OUT')} className="px-3 py-1.5 bg-indigo-600 text-white font-semibold rounded-lg">
+                          Log Student Exit (Check-Out)
+                        </button>
+                        <button onClick={() => handleGateAction('CHECK_IN')} className="px-3 py-1.5 bg-emerald-700 text-white font-semibold rounded-lg">
+                          Log Student Return (Check-In)
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Visitor Logging Form */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+              <h2 className="text-base font-bold text-slate-900">Log Campus Visitor Entry</h2>
+              <form onSubmit={handleAddVisitor} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" value={vName} onChange={e => setVName(e.target.value)} placeholder="Visitor Full Name" className="border border-slate-200 rounded-xl p-2 bg-slate-50" />
+                  <input type="text" value={vPhone} onChange={e => setVPhone(e.target.value)} placeholder="Phone Number" className="border border-slate-200 rounded-xl p-2 bg-slate-50" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={vIdType} onChange={e => setVIdType(e.target.value)} className="border border-slate-200 rounded-xl p-2 bg-slate-50">
+                    <option>Driving License</option>
+                    <option>Aadhaar Card</option>
+                    <option>Passport</option>
+                    <option>Voter ID</option>
+                  </select>
+                  <input type="text" value={vIdNumber} onChange={e => setVIdNumber(e.target.value)} placeholder="Govt ID Number" className="border border-slate-200 rounded-xl p-2 bg-slate-50 font-mono" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="text" value={vStudent} onChange={e => setVStudent(e.target.value)} placeholder="Student Visiting" className="border border-slate-200 rounded-xl p-2 bg-slate-50" />
+                  <input type="text" value={vRelation} onChange={e => setVRelation(e.target.value)} placeholder="Relation" className="border border-slate-200 rounded-xl p-2 bg-slate-50" />
+                </div>
+                <button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2 rounded-xl">
+                  Issue Visitor Badge & Log In
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Visitors Log Table */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <h2 className="text-base font-bold text-slate-900">Today's Campus Visitor Logs ({visitors.length})</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 uppercase font-semibold text-[10px] border-y border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">Visitor</th>
+                    <th className="py-3 px-4">ID Proof</th>
+                    <th className="py-3 px-4">Resident Visiting</th>
+                    <th className="py-3 px-4">Check-In</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {visitors.map(v => (
+                    <tr key={v.id} className="hover:bg-slate-50/70">
+                      <td className="py-3 px-4 font-bold text-slate-800">{v.name} <span className="block text-[10px] text-slate-400 font-normal">{v.phone}</span></td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">{v.idType}: {v.idNumber}</td>
+                      <td className="py-3 px-4 text-slate-700">{v.studentName} ({v.relation})</td>
+                      <td className="py-3 px-4 text-slate-500">{v.inTime}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${v.status === 'INSIDE' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                          {v.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {v.status === 'INSIDE' && (
+                          <button onClick={() => handleVisitorExit(v.id)} className="px-2.5 py-1 bg-red-50 text-red-700 hover:bg-red-100 font-semibold rounded text-[11px]">
+                            Check Out
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Render the App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
